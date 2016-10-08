@@ -89,27 +89,42 @@ DATA = {"frames": {
 
 /////////////// State mgr
 scenes = [];
-currentSceneIndex = 0; // The actual current scene (or state, whatever you call it)
-overlayScene = false; // If true, current scene will not be updated but still drawn. Used to handle pausing and other such menus
-overlaySceneIndex = 1; // The scene that will be drawn on top of the current one, if overlayScene is true
+sceneVars = {
+    current: {
+        index: 0,
+        id: "_loader"
+    },
+    overlay: {
+        index: 1,
+        id: "",
+        active: false
+    },
+    lastUpdateTime: 0,
+    elapsedUpdateTime: 0
+};
+//currentSceneIndex = 0; // The actual current scene (or state, whatever you call it)
+//currentSceneName = "";
+//overlayScene = false; // If true, current scene will not be updated but still drawn. Used to handle pausing and other such menus
+//overlaySceneIndex = 1; // The scene that will be drawn on top of the current one, if overlayScene is true
 
 // Provides timing fallback
 window.performance = window.performance || {};
 performance.now = function(){return performance.now||performance.mozNow||performance.msNow||performance.oNow||performance.webkitNow||function(){return(new Date).getTime()}}();
 // Scene timing
-sceneLastUpdateTime = 0;     // Used to calculate time delta between each frame 
-sceneElapsedUpdateTime = 0;  //
+//sceneLastUpdateTime = 0;     // Used to calculate time delta between each frame 
+//sceneElapsedUpdateTime = 0;  //
 
 function setScene(id) { // Changes the current scene
 // Searches for the scene by ID, if found it de-inits the current scene, changes the scene, and inits the new one.
 	for (var i = 0; i < scenes.length; i++) {
 		if (scenes[i].id == id) {
-			if (currentSceneIndex == i) return false; // It's the same scene!
-			if (scenes[currentSceneIndex].cleanUp) scenes[currentSceneIndex].cleanUp();
-			currentSceneIndex = i;
-			sceneLastUpdateTime = 0;
-			sceneElapsedUpdateTime = 0;
-			if (scenes[currentSceneIndex].init) scenes[currentSceneIndex].init();
+			if (sceneVars.current.index == i) return false; // It's the same scene!
+			if (scenes[sceneVars.current.index].cleanUp) scenes[sceneVars.current.index].cleanUp();
+			sceneVars.current.index = i;
+            sceneVars.current.id = scenes[i].id;
+			sceneVars.lastUpdateTime = 0;
+			sceneVars.elapsedUpdateTime = 0;
+			if (scenes[sceneVars.current.index].init) scenes[sceneVars.current.index].init();
 			return true;
 		}
 	}
@@ -122,25 +137,25 @@ function scene(id, obj) { // Adds a new scene. I called it just "scene" because 
 
 // The update and draw logic below
 function sceneUpdate () {
-	sceneElapsedUpdateTime = performance.now() - sceneLastUpdateTime;
-	scenes[currentSceneIndex].update();
-	sceneLastUpdateTime = performance.now();
+	sceneVars.elapsedUpdateTime = performance.now() - sceneVars.lastUpdateTime;
+	scenes[sceneVars.current.index].update();
+	sceneVars.lastUpdateTime = performance.now();
 }
 function sceneOverlayUpdate() {
-	sceneElapsedUpdateTime = performance.now() - sceneLastUpdateTime;
-	scenes[overlaySceneIndex].update();
-	sceneLastUpdateTime = performance.now();
+	sceneVars.elapsedUpdateTime = performance.now() - sceneVars.lastUpdateTime;
+	scenes[sceneVars.overlay.index].update();
+	sceneVars.lastUpdateTime = performance.now();
 }
 function sceneDraw() {
-	scenes[currentSceneIndex].draw();
+	scenes[sceneVars.current.index].draw();
 }
 function sceneOverlayDraw() {
-	scenes[overlaySceneIndex].draw();
+	scenes[sceneVars.current.index].draw();
 }
 lastFrame = 0;
 function pipeline() { // This is the main game loop, handles updating, drawing, and overlays (i.e. pausing)
 	if (performance.now() - lastFrame > 10) {
-		if (!overlayScene) {
+		if (!sceneVars.overlay.active) {
 			sceneUpdate();
 			sceneDraw();
 		}
@@ -154,18 +169,23 @@ function pipeline() { // This is the main game loop, handles updating, drawing, 
 	}
 	requestAnimationFrame(pipeline);
 }
-function startEngine(loop) {
-	if (scenes[currentSceneIndex].init) scenes[currentSceneIndex].init();
+function startEngine(loop, canvasID) {
+	if (scenes[sceneVars.current.index].init)
+        scenes[sceneVars.current.index].init();
+    canvas = document.getElementById(canvasID);
+    console.log(canvas);
+    ctx = canvas.getContext("2d");
 	requestAnimationFrame(loop);
 }
 function showOverlayScene(id) {
 		for (var i = 0; i < scenes.length; i++) {
 		if (scenes[i].id == id) {
-			if (currentSceneIndex == i) return false; // You can't overlay a scene over itself
-			overlaySceneIndex = i;
-			sceneLastUpdateTime = 0;
-			sceneElapsedUpdateTime = 0;
-			if (scenes[overlaySceneIndex].init) scenes[overlaySceneIndex].init();
+			if (sceneVars.current.index == i) return false; // You can't overlay a scene over itself
+			sceneVars.overlay.index = i;
+            sceneVars.overlay.id = scenes[i].id;
+			sceneVars.lastUpdateTime = 0;
+			sceneVars.elapsedUpdateTime = 0;
+			if (scenes[sceneVars.overlay.index].init) scenes[sceneVars.overlay.index].init();
 			return true;
 		}
 	}
@@ -573,22 +593,45 @@ function dbg_calcFps() {
 	return Math.floor(sum / dbg_fpsQueue.length);
 }
 
+///////////// Graphics ===============================================================================
+canvas = ctx = null;
+
+
 
 
 
 ///////////// UI Code ================================================================================
-// If you're reading this, you're probably wondering what idiot would use the Canvas for UI code
-// when there's HTML. However, there's a method to my madness. Reasons:
-// 1. Canvas UI will scale along with the rest of the canvas
-// 2. Canvas gives finer grained graphics control
-// 3. If UI objects are in Javascript rather than DOM, they can be treated as game objects
+uiTheme = {
+    loader: {
+        background: "#B50E35",
+        backgroundShade: "#510617" // 510617
+    }
+};
+loaderUI = {
+    init: function() {
+
+    },
+    update: function() {
+
+    },
+    draw: function() {
+        var gradient = ctx.createRadialGradient(canvas.width / 2, canvas.height * 0.4, 0, canvas.width / 2, canvas.height / 2, canvas.width * 0.55);
+        gradient.addColorStop(0, uiTheme.loader.background);
+        gradient.addColorStop(1, uiTheme.loader.backgroundShade);
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
+    },
+    cleanUp: function() {
+
+    },
+};
 
 
 
 
 
 ///////////// Utils =============================================================================
-function inRange(n, min, max) {
+function inRange(n, min, max) { // Checks if 'n' is between 'min' and 'max'
 	var _min = Math.min(min, max),
 		_max = Math.max(min, max);
 	if (n >= min && n <= max) return true;
@@ -728,7 +771,7 @@ scene("intro", {
 	}
 });
 function init() {
-	startEngine(pipeline);
+	startEngine(pipeline, "testCanvas");
 	requestAnimationFrame(pipeline);
 }
 function drawHoriz(ctx, point, length, collide) {
