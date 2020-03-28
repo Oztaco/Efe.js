@@ -111,7 +111,7 @@ sceneVars = {
 window.performance = window.performance || {};
 performance.now = function(){return performance.now||performance.mozNow||performance.msNow||performance.oNow||performance.webkitNow||function(){return(new Date).getTime()}}();
 // Scene timing
-//sceneLastUpdateTime = 0;     // Used to calculate time delta between each frame 
+//sceneLastUpdateTime = 0;     // Used to calculate time delta between each frame
 //sceneElapsedUpdateTime = 0;  //
 
 function setScene(id) { // Changes the current scene
@@ -174,7 +174,9 @@ function startEngine(loop, canvasID) {
         scenes[sceneVars.current.index].init();
     canvas = document.getElementById(canvasID);
     console.log(canvas);
-    ctx = canvas.getContext("2d");
+	ctx = canvas.getContext("2d");
+	initSurfaces();
+	dpiScaleLiveSurfaces();
 	requestAnimationFrame(loop);
 }
 function showOverlayScene(id) {
@@ -193,7 +195,7 @@ function showOverlayScene(id) {
 }
 
 ///////////// Resource manager =================================================================================
-res = {}; // To access resources, do res.idOfResource 
+res = {}; // To access resources, do res.idOfResource
 resVars = {
 	totalResources: 0,
 	resourcesLeftToDownload: 0,
@@ -209,7 +211,7 @@ function resource(_id, _type, _paths) { // Queues a resource for download. Calle
 		downloaded: false,
 		failed: false,
 		data: (_type == "image") ? new Image() :
-			  (_type == "audio") ? new Audio() : 
+			  (_type == "audio") ? new Audio() :
 			  (console.log(_type + " is not supported by the resource downloader.")) ? false : false // To do: add video support
 	};
 	res[_id] = resi;
@@ -595,6 +597,50 @@ function dbg_calcFps() {
 
 ///////////// Graphics ===============================================================================
 canvas = ctx = null;
+surfaces = {};
+surfaceList = [];
+liveScalingSurfaces = [];
+liveScalingOn = false;
+function surface(id, params) {
+	surfaces[id] = {
+		id: id,
+		element: false,
+		ctx: false,
+		dpiScaling: params.hasOwnProperty('dpiScaling') ? params.dpiScaling : false, // 'initial', 'live', false
+	};
+	surfaceList.push(surfaces[id]);
+	if (surfaces[id].dpiScaling) {
+		// dpiScaleSurface(surfaces[id]);
+	}
+	if (surfaces[id].dpiScaling == 'live') {
+		liveScalingSurfaces.push(surfaces[id]);
+		if (!liveScalingOn)
+			window.addEventListener("resize", function (e) {
+				dpiScaleLiveSurfaces();
+			});
+	}
+}
+
+function dpiScaleSurface(surface) {
+	var dpr = window.devicePixelRatio || 1;
+	var rect = surface.element.getBoundingClientRect();
+	surface.element.width = rect.width * dpr;
+	surface.element.height = rect.height * dpr;
+	// surface.ctx.scale(dpr, dpr); // Consider this in the future
+}
+
+function dpiScaleLiveSurfaces() {
+	for (var i = 0; i < liveScalingSurfaces.length; i++) {
+		dpiScaleSurface(liveScalingSurfaces[i]);
+	}
+}
+
+function initSurfaces() {
+	for (var i = 0; i < surfaceList.length; i++) {
+		surfaceList[i].element = document.getElementById(surfaceList[i].id);
+		surfaceList[i].ctx = document.getElementById(surfaceList[i].id).getContext('2d');
+	}
+}
 
 
 
