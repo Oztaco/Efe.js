@@ -1,3 +1,7 @@
 # Efe.js
 
-This is a library I began developing for personal use several years ago to help with my game development projects. It has also proved helpful in some of my non-game projects. This project is new to Github and the documentation is nearly nonexistent, but I will be adding it shortly (including a more in-depth readme page.
+Efe.js is a barebones Javascript library, geared towards interactive and state-oriented canvas applications. 
+
+It provides features such as state management, resource management, input, and spritesheets. 
+
+This library is a work in progress.
